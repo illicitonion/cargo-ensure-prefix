@@ -1,0 +1,12 @@
+[package]
+name = "single_package_explicit_targets"
+version = "0.1.0"
+authors = ["Daniel Wagner-Hall <dawagner@gmail.com>"]
+edition = "2018"
+
+[lib]
+path = "src/beep.rs"
+
+[[bin]]
+name = "boop"
+path = "src/dir/boop.rs"

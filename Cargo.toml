@@ -1,0 +1,14 @@
+[package]
+name = "cargo-ensure-prefix"
+version = "0.1.0"
+authors = ["Daniel Wagner-Hall <dawagner@gmail.com>"]
+edition = "2018"
+description = "Cargo subcommand to check that all target files have a fixed prefix."
+repository = "https://github.com/illicitonion/cargo-ensure-prefix"
+readme = "README.md"
+categories = ["development-tools", "development-tools::cargo-plugins"]
+license = "BSD-3-Clause"
+
+[dependencies]
+cargo = "0.32"
+clap = "2.32"
