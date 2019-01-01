@@ -13,6 +13,12 @@ use std::path::PathBuf;
 fn main() {
     let matches = App::new("cargo-ensure-prefix")
         .version(crate_version!())
+        // Allow both cargo ensure-prefix and cargo-ensure-prefix to work.
+        .arg(
+            Arg::with_name("dummy")
+                .hidden(true)
+                .possible_value("ensure-prefix"),
+        )
         .arg(
             Arg::with_name("manifest-path")
                 .long("manifest-path")
