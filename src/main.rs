@@ -1,11 +1,9 @@
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 
-use cargo::core::Members;
-use cargo::core::Package;
 use cargo::core::Workspace;
+use cargo::ops::Packages;
 use clap::{crate_version, App, Arg, ArgMatches};
-use std::collections::HashSet;
 use std::env::current_dir;
 use std::io::Read;
 use std::path::PathBuf;
@@ -29,6 +27,12 @@ fn main() {
             Arg::with_name("package")
                 .long("package")
                 .short("p")
+                .takes_value(true)
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("exclude")
+                .long("exclude")
                 .takes_value(true)
                 .multiple(true),
         )
@@ -95,21 +99,29 @@ struct Params {
     prefix: String,
 }
 
+fn values_of(matches: &ArgMatches, name: &str) -> Vec<String> {
+    matches
+        .values_of(name)
+        .unwrap_or_default()
+        .map(str::to_owned)
+        .collect()
+}
+
 fn parse(matches: &ArgMatches) -> Result<Params, String> {
     let prefix_path = matches.value_of("prefix-path").unwrap();
     let prefix = std::fs::read_to_string(prefix_path)
         .map_err(|_| format!("Error reading prefix-path file {}", prefix_path))?;
 
-    let package_filter = match (matches.is_present("all"), matches.values_of("package")) {
-        (true, None) => PackageFilter::All,
-        (false, None) => PackageFilter::Default,
-        (false, Some(packages)) => PackageFilter::Packages(packages.map(str::to_owned).collect()),
-        (true, Some(_)) => return Err("Cannot specify --all and --package".to_owned()),
-    };
+    let packages = Packages::from_flags(
+        matches.is_present("all"),
+        values_of(matches, "exclude"),
+        values_of(matches, "package"),
+    )
+    .map_err(|err| format!("Error parsing package spec: {}", err))?;
 
     let paths_to_check = list_paths(
         PathBuf::from(matches.value_of("manifest-path").unwrap()),
-        &package_filter,
+        &packages,
     )?;
 
     Ok(Params {
@@ -118,37 +130,7 @@ fn parse(matches: &ArgMatches) -> Result<Params, String> {
     })
 }
 
-#[derive(Debug)]
-enum PackageFilter {
-    All,
-    Default,
-    Packages(HashSet<String>),
-}
-
-impl PackageFilter {
-    fn members<'a>(&'a self, workspace: &'a Workspace) -> Members<'a, 'a> {
-        match self {
-            PackageFilter::Default => workspace.default_members(),
-            PackageFilter::All | PackageFilter::Packages(_) => workspace.members(),
-        }
-    }
-
-    fn filter(&self, package: &Package) -> bool {
-        match self {
-            PackageFilter::Packages(ref packages) => packages.contains(package.name().as_str()),
-            PackageFilter::All | PackageFilter::Default => true,
-        }
-    }
-
-    fn packages<'a>(&'a self, workspace: &'a Workspace) -> impl Iterator<Item = &'a Package> {
-        self.members(workspace).filter(move |p| self.filter(p))
-    }
-}
-
-fn list_paths(
-    manifest_path: PathBuf,
-    package_filter: &PackageFilter,
-) -> Result<Vec<PathBuf>, String> {
+fn list_paths(manifest_path: PathBuf, packages: &Packages) -> Result<Vec<PathBuf>, String> {
     let mut manifest_path = manifest_path;
     if !manifest_path.exists() {
         return Err(format!("Could not find {}", manifest_path.display()));
@@ -164,8 +146,10 @@ fn list_paths(
         unreachable!();
     });
 
-    Ok(package_filter
-        .packages(&workspace)
+    Ok(packages
+        .get_packages(&workspace)
+        .map_err(|err| format!("{}", err))?
+        .into_iter()
         .flat_map(|package| package.targets())
         .map(|target| target.src_path().path().to_owned())
         .collect())
@@ -173,8 +157,8 @@ fn list_paths(
 
 #[cfg(test)]
 mod test_list_paths {
-    use super::PackageFilter;
     use cargo::core::Workspace;
+    use cargo::ops::Packages;
     use cargo::Config;
     use std::collections::HashSet;
     use std::env::current_dir;
@@ -183,7 +167,7 @@ mod test_list_paths {
     #[test]
     fn single_package_multiple_explicit_targets() {
         assert_packages(
-            &PackageFilter::Default,
+            &Packages::Default,
             "tests/projects/single_package_explicit_targets/Cargo.toml",
             &["single_package_explicit_targets"],
         );
@@ -192,7 +176,7 @@ mod test_list_paths {
     #[test]
     fn workspace_default() {
         assert_packages(
-            &PackageFilter::Default,
+            &Packages::Default,
             "tests/projects/workspace_root/Cargo.toml",
             &["workspace_root", "wlib"],
         );
@@ -201,7 +185,7 @@ mod test_list_paths {
     #[test]
     fn workspace_all() {
         assert_packages(
-            &PackageFilter::All,
+            &Packages::All,
             "tests/projects/workspace_root/Cargo.toml",
             &["workspace_root", "wbin", "wlib"],
         );
@@ -210,12 +194,12 @@ mod test_list_paths {
     #[test]
     fn workspace_package_list() {
         assert_packages(
-            &PackageFilter::Packages(vec!["wbin".to_owned()].into_iter().collect()),
+            &Packages::Packages(vec!["wbin".to_owned()].into_iter().collect()),
             "tests/projects/workspace_root/Cargo.toml",
             &["wbin"],
         );
         assert_packages(
-            &PackageFilter::Packages(
+            &Packages::Packages(
                 vec!["wbin", "workspace_root"]
                     .into_iter()
                     .map(str::to_owned)
@@ -228,46 +212,48 @@ mod test_list_paths {
 
     #[test]
     fn workspace_package_not_found() {
-        assert_packages(
-            &PackageFilter::Packages(vec!["doesnotexist".to_owned()].into_iter().collect()),
-            "tests/projects/workspace_root/Cargo.toml",
-            &[],
+        assert_eq!(
+            packages(
+                &Packages::Packages(vec!["doesnotexist".to_owned()].into_iter().collect()),
+                "tests/projects/workspace_root/Cargo.toml"
+            ),
+            Err("package `doesnotexist` is not a member of the workspace".to_owned())
         );
     }
 
     #[test]
     fn manifest_is_in_workspace() {
         assert_packages(
-            &PackageFilter::Default,
+            &Packages::Default,
             "tests/projects/workspace_root/wbin/Cargo.toml",
             &["workspace_root", "wlib"],
         );
         assert_packages(
-            &PackageFilter::All,
+            &Packages::All,
             "tests/projects/workspace_root/wbin/Cargo.toml",
             &["workspace_root", "wbin", "wlib"],
         );
         assert_packages(
-            &PackageFilter::Packages(vec!["wbin".to_owned()].into_iter().collect()),
+            &Packages::Packages(vec!["wbin".to_owned()].into_iter().collect()),
             "tests/projects/workspace_root/Cargo.toml",
             &["wbin"],
         );
     }
 
-    fn assert_packages(
-        package_filter: &PackageFilter,
-        manifest_path: &str,
-        expected_packages: &[&str],
-    ) {
+    fn packages(spec: &Packages, manifest_path: &str) -> Result<HashSet<String>, String> {
         let config = Config::default().unwrap();
         let workspace = Workspace::new(&abs(manifest_path), &config).unwrap();
-        let got_packages: HashSet<_> = package_filter
-            .members(&workspace)
-            .filter(|p| package_filter.filter(p))
+        Ok(spec
+            .get_packages(&workspace)
+            .map_err(|e| format!("{}", e))?
+            .into_iter()
             .map(|p| p.name().as_str().to_owned())
-            .collect();
+            .collect())
+    }
+
+    fn assert_packages(spec: &Packages, manifest_path: &str, expected_packages: &[&str]) {
         assert_eq!(
-            got_packages,
+            packages(spec, manifest_path).unwrap(),
             expected_packages.iter().map(|s| s.to_string()).collect()
         );
     }

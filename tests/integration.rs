@@ -59,6 +59,18 @@ fn workspace_some_match() {
 }
 
 #[test]
+fn workspace_all_match_because_exclude() {
+    let output = run_command(&[
+        "--prefix-path=tests/prefixes/long.txt",
+        "--manifest-path=tests/projects/workspace_root/Cargo.toml",
+        "--all",
+        "--exclude",
+        "wbin",
+    ]);
+    assert_eq!(StringOutput::new(true, "", ""), output.into(),);
+}
+
+#[test]
 fn workspace_none_match() {
     let workspace_root = current_dir()
         .unwrap()
@@ -122,7 +134,11 @@ fn package_not_found() {
         "doesnotexist",
     ]);
     assert_eq!(
-        StringOutput::new(false, "", "Didn't find matching package(s)\n"),
+        StringOutput::new(
+            false,
+            "",
+            "package `doesnotexist` is not a member of the workspace\n"
+        ),
         output.into()
     );
 }
@@ -174,21 +190,6 @@ fn prefix_file_not_found() {
             &format!("Error reading prefix-path file {}\n", path)
         ),
         output.into()
-    );
-}
-
-#[test]
-fn all_and_package() {
-    let output = run_command(&[
-        "--prefix-path=tests/prefixes/short.txt",
-        "--manifest-path=tests/projects/workspace_root/Cargo.toml",
-        "--all",
-        "-p",
-        "wlib",
-    ]);
-    assert_eq!(
-        StringOutput::new(false, "", "Cannot specify --all and --package\n",),
-        output.into(),
     );
 }
 
