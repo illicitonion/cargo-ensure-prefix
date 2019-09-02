@@ -3,52 +3,45 @@
 
 use cargo::core::Workspace;
 use cargo::ops::Packages;
-use clap::{crate_version, App, Arg, ArgMatches};
 use std::env::current_dir;
 use std::io::Read;
 use std::path::PathBuf;
+use structopt::StructOpt;
+
+#[derive(StructOpt)]
+#[structopt(
+    name = "cargo-ensure-prefix",
+    about = "Ensures the main file for all crates in a workspace have a particular prefix."
+)]
+struct Opt {
+    // Ignored to allow ensure-prefix to optionally be a hidden subcommand as specified by cargo.
+    #[structopt(hidden = true)]
+    _dummy: Option<String>,
+
+    #[structopt(long, parse(from_os_str))]
+    manifest_path: PathBuf,
+
+    #[structopt(short, long)]
+    package: Vec<String>,
+
+    #[structopt(long)]
+    exclude: Vec<String>,
+
+    #[structopt(long)]
+    all: bool,
+
+    #[structopt(long, parse(from_os_str))]
+    prefix_path: PathBuf,
+}
 
 fn main() {
-    let matches = App::new("cargo-ensure-prefix")
-        .version(crate_version!())
-        // Allow both cargo ensure-prefix and cargo-ensure-prefix to work.
-        .arg(
-            Arg::with_name("dummy")
-                .hidden(true)
-                .possible_value("ensure-prefix"),
-        )
-        .arg(
-            Arg::with_name("manifest-path")
-                .long("manifest-path")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("package")
-                .long("package")
-                .short("p")
-                .takes_value(true)
-                .multiple(true),
-        )
-        .arg(
-            Arg::with_name("exclude")
-                .long("exclude")
-                .takes_value(true)
-                .multiple(true),
-        )
-        .arg(Arg::with_name("all").long("all"))
-        .arg(
-            Arg::with_name("prefix-path")
-                .long("prefix-path")
-                .required(true)
-                .takes_value(true),
-        )
-        .get_matches();
+    //        .version(crate_version!())
+    let opt = Opt::from_args();
 
     let Params {
         paths_to_check,
         prefix,
-    } = parse(&matches).unwrap_or_else(|err| {
+    } = parse(opt).unwrap_or_else(|err| {
         die(&err);
         unreachable!();
     });
@@ -99,30 +92,23 @@ struct Params {
     prefix: String,
 }
 
-fn values_of(matches: &ArgMatches, name: &str) -> Vec<String> {
-    matches
-        .values_of(name)
-        .unwrap_or_default()
-        .map(str::to_owned)
-        .collect()
-}
+fn parse(opt: Opt) -> Result<Params, String> {
+    let Opt {
+        prefix_path,
+        manifest_path,
+        all,
+        exclude,
+        package,
+        ..
+    } = opt;
 
-fn parse(matches: &ArgMatches) -> Result<Params, String> {
-    let prefix_path = matches.value_of("prefix-path").unwrap();
-    let prefix = std::fs::read_to_string(prefix_path)
-        .map_err(|_| format!("Error reading prefix-path file {}", prefix_path))?;
+    let prefix = std::fs::read_to_string(&prefix_path)
+        .map_err(|_| format!("Error reading prefix-path file {}", prefix_path.display()))?;
 
-    let packages = Packages::from_flags(
-        matches.is_present("all"),
-        values_of(matches, "exclude"),
-        values_of(matches, "package"),
-    )
-    .map_err(|err| format!("Error parsing package spec: {}", err))?;
+    let packages = Packages::from_flags(all, exclude, package)
+        .map_err(|err| format!("Error parsing package spec: {}", err))?;
 
-    let paths_to_check = list_paths(
-        PathBuf::from(matches.value_of("manifest-path").unwrap()),
-        &packages,
-    )?;
+    let paths_to_check = list_paths(manifest_path.clone(), &packages)?;
 
     Ok(Params {
         paths_to_check,

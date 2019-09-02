@@ -1,6 +1,6 @@
 [package]
 name = "cargo-ensure-prefix"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Daniel Wagner-Hall <dawagner@gmail.com>"]
 edition = "2018"
 description = "Cargo subcommand to check that all target files have a fixed prefix."
@@ -11,4 +11,4 @@ license = "BSD-3-Clause"
 
 [dependencies]
 cargo = "0.32"
-clap = "2.32"
+structopt = "0.3"
