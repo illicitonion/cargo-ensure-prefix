@@ -35,7 +35,6 @@ struct Opt {
 }
 
 fn main() {
-    //        .version(crate_version!())
     let opt = Opt::from_args();
 
     let Params {
