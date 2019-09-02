@@ -4,8 +4,8 @@ rust:
   - beta
   - nightly
 before_script:
-  - rustup component add rustfmt-preview
-  - rustup component add clippy-preview
+  - rustup component add rustfmt
+  - rustup component add clippy
 script:
   - cargo test --verbose --all
   - cargo fmt --all -- --check
