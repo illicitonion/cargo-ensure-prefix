@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 
-use cargo::core::Workspace;
+use cargo::core::{Package, Workspace};
 use cargo::ops::Packages;
 use std::env::current_dir;
 use std::io::Read;
@@ -135,7 +135,7 @@ fn list_paths(manifest_path: PathBuf, packages: &Packages) -> Result<Vec<PathBuf
         .get_packages(&workspace)
         .map_err(|err| format!("{}", err))?
         .into_iter()
-        .flat_map(|package| package.targets())
+        .flat_map(Package::targets)
         .map(|target| target.src_path().path().to_owned())
         .collect())
 }
