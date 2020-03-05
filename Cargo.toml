@@ -1,6 +1,6 @@
 [package]
 name = "cargo-ensure-prefix"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Daniel Wagner-Hall <dawagner@gmail.com>"]
 edition = "2018"
 description = "Cargo subcommand to check that all target files have a fixed prefix."
