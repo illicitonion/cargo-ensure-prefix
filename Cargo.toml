@@ -12,3 +12,6 @@ license = "BSD-3-Clause"
 [dependencies]
 cargo = "0.32"
 structopt = "0.3"
+# Workaround incompatibility between failure_derive and quote 1.0.3.
+# See https://users.rust-lang.org/t/failure-derive-compilation-error/39062
+quote = "=1.0.2"
