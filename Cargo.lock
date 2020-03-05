@@ -136,9 +136,10 @@ dependencies = [
 
 [[package]]
 name = "cargo-ensure-prefix"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cargo 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

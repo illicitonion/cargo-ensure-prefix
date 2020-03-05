@@ -107,7 +107,7 @@ fn parse(opt: Opt) -> Result<Params, String> {
     let packages = Packages::from_flags(all, exclude, package)
         .map_err(|err| format!("Error parsing package spec: {}", err))?;
 
-    let paths_to_check = list_paths(manifest_path.clone(), &packages)?;
+    let paths_to_check = list_paths(manifest_path, &packages)?;
 
     Ok(Params {
         paths_to_check,
