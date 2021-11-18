@@ -133,14 +133,10 @@ fn package_not_found() {
         "-p",
         "doesnotexist",
     ]);
-    assert_eq!(
-        StringOutput::new(
-            false,
-            "",
-            "package `doesnotexist` is not a member of the workspace\n"
-        ),
-        output.into()
-    );
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = std::str::from_utf8(&output.stderr).unwrap();
+    assert!(stderr.starts_with("package(s) `doesnotexist` not found in workspace"));
 }
 
 #[test]
