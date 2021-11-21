@@ -67,7 +67,7 @@ fn main() {
             }
         };
         if !has_prefix {
-            violations.push(path.to_owned());
+            violations.push(path.clone());
         }
     }
 
@@ -136,7 +136,7 @@ fn list_paths(manifest_path: PathBuf, packages: &Packages) -> Result<Vec<PathBuf
         .map_err(|err| format!("{}", err))?
         .into_iter()
         .flat_map(Package::targets)
-        .map(|target| target.src_path().path().to_owned())
+        .filter_map(|target| target.src_path().path().map(ToOwned::to_owned))
         .collect())
 }
 
@@ -197,13 +197,12 @@ mod test_list_paths {
 
     #[test]
     fn workspace_package_not_found() {
-        assert_eq!(
-            packages(
-                &Packages::Packages(vec!["doesnotexist".to_owned()].into_iter().collect()),
-                "tests/projects/workspace_root/Cargo.toml"
-            ),
-            Err("package `doesnotexist` is not a member of the workspace".to_owned())
-        );
+        let err = packages(
+            &Packages::Packages(vec!["doesnotexist".to_owned()].into_iter().collect()),
+            "tests/projects/workspace_root/Cargo.toml",
+        )
+        .unwrap_err();
+        assert!(err.starts_with("package(s) `doesnotexist` not found in workspace"));
     }
 
     #[test]
@@ -211,7 +210,7 @@ mod test_list_paths {
         assert_packages(
             &Packages::Default,
             "tests/projects/workspace_root/wbin/Cargo.toml",
-            &["workspace_root", "wlib"],
+            &["wbin"],
         );
         assert_packages(
             &Packages::All,
